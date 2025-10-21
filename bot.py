@@ -1,7 +1,7 @@
 import os
 import logging
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # Настройка логирования
 logging.basicConfig(
@@ -11,94 +11,55 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-# Проверка переменных окружения
-def check_environment():
-    BOT_TOKEN = os.getenv('BOT_TOKEN')
-    ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID')
-    
-    if not BOT_TOKEN:
-        logger.error("❌ BOT_TOKEN не установлен!")
-        return None, None
-    
-    if not ADMIN_CHAT_ID:
-        logger.error("❌ ADMIN_CHAT_ID не установлен!")
-        return None, None
-    
-    logger.info("✅ Переменные окружения загружены успешно")
-    return BOT_TOKEN, ADMIN_CHAT_ID
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.message.from_user
+    await update.message.reply_text(f"👋 Привет, {user.first_name}! Я бот для связи с администратором.")
 
-def start(update: Update, context: CallbackContext):
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        user = update.message.from_user
-        welcome_text = f"""
-👋 Привет, {user.first_name}!
-
-Я бот для связи с администратором. 
-Просто напишите ваше сообщение, и я перешлю его администратору.
-        """
-        update.message.reply_text(welcome_text)
-    except Exception as e:
-        logger.error(f"Ошибка в команде /start: {e}")
-
-def handle_user_message(update: Update, context: CallbackContext):
-    try:
-        BOT_TOKEN, ADMIN_CHAT_ID = check_environment()
-        if not BOT_TOKEN or not ADMIN_CHAT_ID:
-            update.message.reply_text("❌ Бот временно недоступен")
-            return
-
         user = update.message.from_user
         message_text = update.message.text
         
+        # Информация о пользователе
         user_info = f"{user.first_name} {user.last_name or ''} (@{user.username or 'нет'})"
         
-        admin_message = f"""
-📩 Новое сообщение от пользователя:
-👤 {user_info}
-🆔 ID: {user.id}
-💬 Сообщение: {message_text}
-        """
+        # Сообщение для администратора
+        admin_message = f"📩 Новое сообщение:\n👤 {user_info}\n🆔 ID: {user.id}\n💬 {message_text}"
         
-        context.bot.send_message(
-            chat_id=ADMIN_CHAT_ID,
-            text=admin_message
-        )
-        update.message.reply_text("✅ Ваше сообщение отправлено администратору!")
+        # Отправляем администратору
+        admin_chat_id = os.getenv('ADMIN_CHAT_ID')
+        if admin_chat_id:
+            await context.bot.send_message(chat_id=admin_chat_id, text=admin_message)
+        
+        await update.message.reply_text("✅ Сообщение отправлено администратору!")
         
     except Exception as e:
-        logger.error(f"Ошибка обработки сообщения: {e}")
-        update.message.reply_text("❌ Ошибка при отправке сообщения")
+        logger.error(f"Ошибка: {e}")
+        await update.message.reply_text("❌ Ошибка при отправке сообщения")
 
 def main():
     logger.info("🔄 Запуск бота...")
     
-    # Проверяем переменные окружения
-    BOT_TOKEN, ADMIN_CHAT_ID = check_environment()
-    if not BOT_TOKEN or not ADMIN_CHAT_ID:
-        logger.error("⛔ Не удалось запустить бота: отсутствуют переменные окружения")
+    # Получаем токен из переменных окружения
+    token = os.getenv('BOT_TOKEN')
+    if not token:
+        logger.error("❌ BOT_TOKEN не найден!")
         return
     
     try:
-        # Создаем updater
-        updater = Updater(BOT_TOKEN, use_context=True)
+        # Создаем и запускаем бота
+        application = Application.builder().token(token).build()
         
-        # Получаем dispatcher для регистрации обработчиков
-        dp = updater.dispatcher
-        
-        # Добавляем обработчики
-        dp.add_handler(CommandHandler("start", start))
-        dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_user_message))
+        # Обработчики команд
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
         # Запускаем бота
-        updater.start_polling()
-        logger.info("✅ Бот успешно запущен и готов к работе!")
-        print("✅ Бот успешно запущен и готов к работе!")
-        
-        # Бесконечный цикл
-        updater.idle()
+        application.run_polling()
+        logger.info("✅ Бот запущен успешно!")
         
     except Exception as e:
-        logger.error(f"⛔ Критическая ошибка при запуске бота: {e}")
+        logger.error(f"❌ Ошибка запуска: {e}")
 
 if __name__ == "__main__":
     main()
