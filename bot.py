@@ -1,8 +1,7 @@
 import os
 import logging
-import asyncio
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 # Настройка логирования
 logging.basicConfig(
@@ -28,7 +27,7 @@ def check_environment():
     logger.info("✅ Переменные окружения загружены успешно")
     return BOT_TOKEN, ADMIN_CHAT_ID
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def start(update: Update, context: CallbackContext):
     try:
         user = update.message.from_user
         welcome_text = f"""
@@ -37,15 +36,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 Я бот для связи с администратором. 
 Просто напишите ваше сообщение, и я перешлю его администратору.
         """
-        await update.message.reply_text(welcome_text)
+        update.message.reply_text(welcome_text)
     except Exception as e:
         logger.error(f"Ошибка в команде /start: {e}")
 
-async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def handle_user_message(update: Update, context: CallbackContext):
     try:
         BOT_TOKEN, ADMIN_CHAT_ID = check_environment()
         if not BOT_TOKEN or not ADMIN_CHAT_ID:
-            await update.message.reply_text("❌ Бот временно недоступен")
+            update.message.reply_text("❌ Бот временно недоступен")
             return
 
         user = update.message.from_user
@@ -60,15 +59,15 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 💬 Сообщение: {message_text}
         """
         
-        await context.bot.send_message(
+        context.bot.send_message(
             chat_id=ADMIN_CHAT_ID,
             text=admin_message
         )
-        await update.message.reply_text("✅ Ваше сообщение отправлено администратору!")
+        update.message.reply_text("✅ Ваше сообщение отправлено администратору!")
         
     except Exception as e:
         logger.error(f"Ошибка обработки сообщения: {e}")
-        await update.message.reply_text("❌ Ошибка при отправке сообщения")
+        update.message.reply_text("❌ Ошибка при отправке сообщения")
 
 def main():
     logger.info("🔄 Запуск бота...")
@@ -80,24 +79,26 @@ def main():
         return
     
     try:
-        # Создаем приложение
-        application = Application.builder().token(BOT_TOKEN).build()
+        # Создаем updater
+        updater = Updater(BOT_TOKEN, use_context=True)
+        
+        # Получаем dispatcher для регистрации обработчиков
+        dp = updater.dispatcher
         
         # Добавляем обработчики
-        application.add_handler(CommandHandler("start", start))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_message))
+        dp.add_handler(CommandHandler("start", start))
+        dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_user_message))
         
         # Запускаем бота
+        updater.start_polling()
         logger.info("✅ Бот успешно запущен и готов к работе!")
         print("✅ Бот успешно запущен и готов к работе!")
         
-        # Бесконечный polling
-        application.run_polling()
+        # Бесконечный цикл
+        updater.idle()
         
     except Exception as e:
         logger.error(f"⛔ Критическая ошибка при запуске бота: {e}")
 
 if __name__ == "__main__":
     main()
-
-
