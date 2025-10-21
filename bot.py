@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 # Проверка переменных окружения
 def check_environment():
-    BOT_TOKEN = os.getenv('BOT_TOKEN')
-    ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID')
+    BOT_TOKEN = os.getenv('7819290169:AAEVk0nYLbFSFU6WVJHaFpWg4lIHj4iwTmc')
+    ADMIN_CHAT_ID = os.getenv('1247168929')
     
     if not BOT_TOKEN:
         logger.error("❌ BOT_TOKEN не установлен!")
@@ -99,3 +99,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
